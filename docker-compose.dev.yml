@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  # Included for future use - backend doesn't connect yet
+  db:
+    image: postgres:15
+    container_name: geostory-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ls_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-locationstory}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - geostory-network
+    # Port 5432 is only accessible to other services, not exposed to host
+    # Uncomment below to access from host (e.g., for DB clients)
+    # ports:
+    #   - "5432:5432"
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: geostory-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database connection string (for future use)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ls_user}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-locationstory}
+      # CORS origins to allow frontend access
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      APP_ENV: ${APP_ENV:-development}
+    depends_on:
+      - db
+    networks:
+      - geostory-network
+    restart: on-failure
+    # Mount source for live reload during development
+    volumes:
+      - ./backend:/app
+      # Exclude volume mount to avoid container using host's venv
+      - /app/venv
+
+  # React + Vite Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: geostory-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # Backend API URL for the frontend
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    networks:
+      - geostory-network
+    # Mount source for hot module replacement
+    volumes:
+      - ./frontend:/app
+      # Exclude node_modules to avoid conflicts
+      - /app/node_modules
+
+networks:
+  geostory-network:
+    driver: bridge
+
+volumes:
+  # Persistent storage for PostgreSQL
+  db-data:
