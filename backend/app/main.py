@@ -1,21 +1,20 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+from app.core.config import settings
 
 # Initialize FastAPI app
-app = FastAPI(title="GeoStory API", version="0.1.0")
+app = FastAPI(
+    title="GeoStory API",
+    version="0.1.0",
+    debug=settings.DEBUG,
+)
 
 # Configure CORS middleware
 # Allows the frontend to communicate with the backend
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

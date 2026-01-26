@@ -3,4 +3,8 @@ uvicorn[standard]
 python-dotenv
 alembic
 psycopg2-binary
-sqlalchemy
+sqlalchemy>=2.0
+asyncpg
+greenlet
+pydantic-settings
+email-validator

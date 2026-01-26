@@ -31,8 +31,13 @@ if config.config_file_name is not None:
 
 # Set sqlalchemy.url from DATABASE_URL environment variable
 # This allows migrations to read the connection string from .env
+# Note: Convert async URL (postgresql+asyncpg://) to sync (postgresql://) for migrations
 database_url = os.getenv("DATABASE_URL")
 if database_url:
+    # Alembic migrations require synchronous database URL
+    # Convert asyncpg to psycopg2 if needed
+    if "postgresql+asyncpg://" in database_url:
+        database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
     config.set_main_option("sqlalchemy.url", database_url)
 else:
     raise ValueError(
