@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models import Story
 from app.schemas.story import StoryCreate
@@ -62,6 +63,39 @@ async def create_story(
     await db.refresh(db_story)
     
     return db_story
+
+
+async def get_story(
+    db: AsyncSession,
+    story_id: UUID,
+) -> Optional[Story]:
+    """Get a single story by ID.
+    
+    Args:
+        db: Async database session
+        story_id: UUID of the story to retrieve
+        
+    Returns:
+        Story: Story ORM instance if found, None otherwise
+        
+    Example:
+        story = await get_story(db, story_id=some_uuid)
+        if story:
+            print(f"Found: {story.title}")
+    """
+    # Build query with eager loading of photos relationship
+    # This prevents lazy-loading issues when serializing to Pydantic
+    stmt = (
+        select(Story)
+        .where(Story.id == story_id)
+        .options(selectinload(Story.photos))
+    )
+    
+    # Execute query
+    result = await db.execute(stmt)
+    story = result.scalar_one_or_none()
+    
+    return story
 
 
 async def list_stories(

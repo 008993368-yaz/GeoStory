@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.stories import create_story, list_stories
+from app.crud.stories import create_story, get_story, list_stories
 from app.deps import get_db
 from app.schemas.story import StoryCreate, StoryList, StoryRead
 
@@ -212,3 +212,44 @@ async def list_stories_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while listing stories",
         )
+
+
+@router.get(
+    "/{story_id}",
+    response_model=StoryRead,
+    status_code=status.HTTP_200_OK,
+    summary="Get a story by ID",
+    description="Retrieve a single story by its UUID. Returns 404 if not found.",
+)
+async def get_story_endpoint(
+    story_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> StoryRead:
+    """Get a story by ID.
+    
+    Args:
+        story_id: UUID of the story to retrieve
+        db: Database session (injected)
+        
+    Returns:
+        StoryRead: Story with all fields including photos
+        
+    Raises:
+        HTTPException 404: Story not found
+        HTTPException 422: Invalid UUID format (automatic FastAPI validation)
+        
+    Example:
+        GET /api/stories/123e4567-e89b-12d3-a456-426614174000
+    """
+    # Fetch story from database
+    story = await get_story(db, story_id=story_id)
+    
+    # Return 404 if not found
+    if story is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Story not found",
+        )
+    
+    # Convert ORM model to Pydantic response
+    return StoryRead.model_validate(story)
