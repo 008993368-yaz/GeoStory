@@ -1,3 +1,6 @@
 fastapi
 uvicorn[standard]
 python-dotenv
+alembic
+psycopg2-binary
+sqlalchemy
