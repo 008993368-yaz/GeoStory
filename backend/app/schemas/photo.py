@@ -7,15 +7,28 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class PhotoBase(BaseModel):
     """Base Photo schema with common fields."""
     
-    gcs_url: str = Field(..., description="Google Cloud Storage URL for the photo")
-    filename: Optional[str] = Field(None, description="Original filename")
-    caption: Optional[str] = Field(None, description="Photo caption or alt text")
+    gcs_url: str = Field(
+        ...,
+        min_length=1,
+        max_length=2048,
+        description="Google Cloud Storage URL for the photo",
+    )
+    filename: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Original filename",
+    )
+    caption: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="Photo caption or alt text",
+    )
     ordinal: int = Field(0, ge=0, description="Display order (0-indexed)")
 
 
@@ -49,9 +62,9 @@ class PhotoUpdate(BaseModel):
     All fields are optional for partial updates.
     """
     
-    gcs_url: Optional[str] = None
-    filename: Optional[str] = None
-    caption: Optional[str] = None
+    gcs_url: Optional[str] = Field(None, min_length=1, max_length=2048)
+    filename: Optional[str] = Field(None, max_length=255)
+    caption: Optional[str] = Field(None, max_length=1000)
     ordinal: Optional[int] = Field(None, ge=0)
     
     model_config = ConfigDict(from_attributes=True)

@@ -4,27 +4,59 @@ These schemas define the shape of Story data in API requests and responses.
 """
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.constants import StoryCategory
 from .photo import PhotoRead
+
+
+# Create a Literal type from the enum for Pydantic validation
+StoryCategoryLiteral = Literal[
+    StoryCategory.TRAVEL,
+    StoryCategory.FOOD,
+    StoryCategory.HISTORY,
+    StoryCategory.CULTURE,
+    StoryCategory.NATURE,
+    StoryCategory.URBAN,
+    StoryCategory.PERSONAL,
+]
 
 
 class StoryBase(BaseModel):
     """Base Story schema with common fields."""
     
-    title: str = Field(..., min_length=1, max_length=500, description="Story title")
-    body: Optional[str] = Field(None, description="Story content (markdown-friendly)")
-    category: Optional[str] = Field(
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Story title",
+    )
+    body: Optional[str] = Field(
         None,
-        pattern="^(travel|food|history|culture|nature|urban|personal)$",
+        max_length=50000,
+        description="Story content (markdown-friendly, max 50k chars)",
+    )
+    category: Optional[StoryCategoryLiteral] = Field(
+        None,
         description="Story category",
     )
     location_lat: float = Field(..., ge=-90, le=90, description="Latitude (WGS84)")
     location_lng: float = Field(..., ge=-180, le=180, description="Longitude (WGS84)")
-    date_of_story: Optional[date] = Field(None, description="Date when the story occurred")
+    date_of_story: Optional[date] = Field(
+        None,
+        description="Date when the story occurred (must not be in the future)",
+    )
+    
+    @field_validator('date_of_story')
+    @classmethod
+    def validate_date_not_future(cls, v: Optional[date]) -> Optional[date]:
+        """Ensure date_of_story is not in the future."""
+        if v is not None and v > date.today():
+            raise ValueError('Story date cannot be in the future')
+        return v
 
 
 class StoryCreate(StoryBase):
@@ -61,14 +93,19 @@ class StoryUpdate(BaseModel):
     """
     
     title: Optional[str] = Field(None, min_length=1, max_length=500)
-    body: Optional[str] = None
-    category: Optional[str] = Field(
-        None,
-        pattern="^(travel|food|history|culture|nature|urban|personal)$",
-    )
+    body: Optional[str] = Field(None, max_length=50000)
+    category: Optional[StoryCategoryLiteral] = None
     location_lat: Optional[float] = Field(None, ge=-90, le=90)
     location_lng: Optional[float] = Field(None, ge=-180, le=180)
     date_of_story: Optional[date] = None
+    
+    @field_validator('date_of_story')
+    @classmethod
+    def validate_date_not_future(cls, v: Optional[date]) -> Optional[date]:
+        """Ensure date_of_story is not in the future."""
+        if v is not None and v > date.today():
+            raise ValueError('Story date cannot be in the future')
+        return v
     
     model_config = ConfigDict(from_attributes=True)
 

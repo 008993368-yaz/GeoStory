@@ -26,6 +26,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.constants import StoryCategory
 from .base import Base
 
 
@@ -96,7 +97,7 @@ class Story(Base):
     category: Mapped[Optional[str]] = mapped_column(
         Text,
         CheckConstraint(
-            "category IN ('travel', 'food', 'history', 'culture', 'nature', 'urban', 'personal')",
+            StoryCategory.sql_check_constraint(),
             name="stories_category_check",
         ),
         nullable=True,
