@@ -1,12 +1,14 @@
 """CRUD operations for Story model.
 
 This module contains database operations for creating, reading, updating,
-and deleting Story records. Currently implements only create functionality.
+and deleting Story records.
 """
 
-from typing import Optional
+from datetime import date
+from typing import List, Optional, Tuple
 from uuid import UUID
 
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Story
@@ -60,3 +62,92 @@ async def create_story(
     await db.refresh(db_story)
     
     return db_story
+
+
+async def list_stories(
+    db: AsyncSession,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+    category: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    q: Optional[str] = None,
+    order: str = "desc",
+) -> Tuple[List[Story], int]:
+    """List stories with filtering, pagination, and ordering.
+    
+    Args:
+        db: Async database session
+        limit: Maximum number of stories to return (capped at 100)
+        offset: Number of stories to skip for pagination
+        category: Filter by exact category match (optional)
+        date_from: Filter stories from this date onwards (optional)
+        date_to: Filter stories up to this date (optional)
+        q: Text search query for title/body (case-insensitive, optional)
+        order: Sort order for created_at ("asc" or "desc", default "desc")
+        
+    Returns:
+        Tuple[List[Story], int]: (list of Story ORM objects, total count)
+        
+    Example:
+        stories, total = await list_stories(
+            db,
+            limit=10,
+            category="travel",
+            q="paris",
+            order="desc"
+        )
+    """
+    # Cap limit to prevent huge responses
+    limit = min(limit, 100)
+    
+    # Build base query
+    stmt = select(Story)
+    
+    # Apply filters
+    filters = []
+    
+    if category:
+        filters.append(Story.category == category)
+    
+    if date_from:
+        filters.append(Story.date_of_story >= date_from)
+    
+    if date_to:
+        filters.append(Story.date_of_story <= date_to)
+    
+    if q:
+        # Case-insensitive search on title OR body
+        # Use ilike for PostgreSQL (safe from SQL injection via parameter binding)
+        search_pattern = f"%{q}%"
+        filters.append(
+            or_(
+                Story.title.ilike(search_pattern),
+                Story.body.ilike(search_pattern),
+            )
+        )
+    
+    # Apply all filters to the query
+    if filters:
+        stmt = stmt.where(*filters)
+    
+    # Count total matching records (before pagination)
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar() or 0
+    
+    # Apply ordering
+    if order.lower() == "asc":
+        stmt = stmt.order_by(Story.created_at.asc())
+    else:
+        stmt = stmt.order_by(Story.created_at.desc())
+    
+    # Apply pagination
+    stmt = stmt.limit(limit).offset(offset)
+    
+    # Execute query and get results
+    result = await db.execute(stmt)
+    stories = result.scalars().all()
+    
+    return list(stories), total

@@ -1,19 +1,20 @@
 """Story API routes.
 
 This module defines the FastAPI router for story-related endpoints.
-Currently implements POST /api/stories for story creation.
+Implements POST and GET endpoints for story creation and listing.
 """
 
-from typing import Optional
+from datetime import date
+from typing import Literal, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.stories import create_story
+from app.crud.stories import create_story, list_stories
 from app.deps import get_db
-from app.schemas.story import StoryCreate, StoryRead
+from app.schemas.story import StoryCreate, StoryList, StoryRead
 
 
 # Router configuration
@@ -120,4 +121,94 @@ async def create_story_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while creating the story",
+        )
+
+
+@router.get(
+    "/",
+    response_model=StoryList,
+    status_code=status.HTTP_200_OK,
+    summary="List stories with filters and pagination",
+    description="Retrieve a paginated list of stories with optional filtering by category, date range, and text search.",
+)
+async def list_stories_endpoint(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=100,
+        description="Maximum number of stories to return (1-100)"
+    ),
+    offset: int = Query(
+        0,
+        ge=0,
+        description="Number of stories to skip for pagination"
+    ),
+    category: Optional[str] = Query(
+        None,
+        description="Filter by story category (exact match)"
+    ),
+    date_from: Optional[date] = Query(
+        None,
+        description="Filter stories from this date onwards (inclusive)"
+    ),
+    date_to: Optional[date] = Query(
+        None,
+        description="Filter stories up to this date (inclusive)"
+    ),
+    q: Optional[str] = Query(
+        None,
+        description="Search query for title or body (case-insensitive)"
+    ),
+    order: Literal["asc", "desc"] = Query(
+        "desc",
+        description="Sort order by created_at timestamp"
+    ),
+) -> StoryList:
+    """List stories with filtering, pagination, and ordering.
+    
+    Args:
+        db: Database session (injected)
+        limit: Maximum stories per page (default 20, max 100)
+        offset: Number of stories to skip (default 0)
+        category: Filter by category (optional)
+        date_from: Filter stories from this date (optional)
+        date_to: Filter stories up to this date (optional)
+        q: Text search in title/body (optional)
+        order: Sort order - "asc" or "desc" (default "desc")
+        
+    Returns:
+        StoryList: Paginated list with items, total count, and pagination metadata
+        
+    Example:
+        GET /api/stories?limit=10&category=travel&q=paris&order=desc
+    """
+    try:
+        # Fetch stories from database
+        items, total = await list_stories(
+            db,
+            limit=limit,
+            offset=offset,
+            category=category,
+            date_from=date_from,
+            date_to=date_to,
+            q=q,
+            order=order,
+        )
+        
+        # Build response with pagination metadata
+        return StoryList(
+            items=items,
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+        
+    except Exception as e:
+        # Unexpected errors
+        # In production, log this error properly
+        # logger.error(f"Unexpected error listing stories: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while listing stories",
         )

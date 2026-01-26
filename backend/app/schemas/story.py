@@ -114,11 +114,24 @@ class StoryList(BaseModel):
     """Schema for paginated story lists.
     
     Used for timeline and filtered story endpoints.
+    Provides pagination metadata for client-side navigation.
     """
     
-    stories: List[StoryRead]
-    total: int
-    page: int = 1
-    page_size: int = 20
+    items: List[StoryRead] = Field(
+        default_factory=list,
+        description="List of stories in this page"
+    )
+    total: int = Field(
+        ...,
+        description="Total number of stories matching the filter criteria"
+    )
+    limit: int = Field(
+        ...,
+        description="Maximum number of items per page"
+    )
+    offset: int = Field(
+        ...,
+        description="Number of items skipped"
+    )
     
     model_config = ConfigDict(from_attributes=True)
