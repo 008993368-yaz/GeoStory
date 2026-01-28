@@ -1,85 +1,66 @@
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <header
-        style={{
-          backgroundColor: 'var(--color-primary)',
-          color: 'var(--color-text-on-primary)',
-          padding: 'var(--spacing-md) var(--spacing-xl)',
-          boxShadow: 'var(--shadow-md)',
-        }}
-      >
-        <nav
+    <calcite-shell style={{ '--calcite-ui-brand': 'var(--color-primary)' } as React.CSSProperties}>
+      <calcite-navigation slot="header" label="GeoStory Navigation">
+        <calcite-navigation-logo
+          slot="logo"
+          heading="GeoStory"
+          onClick={() => navigate('/')}
+          style={{ cursor: 'pointer' }}
+        />
+        
+        <div
+          slot="content-end"
           style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
             display: 'flex',
+            gap: 'var(--spacing-md)',
             alignItems: 'center',
-            gap: 'var(--spacing-xl)',
+            paddingRight: 'var(--spacing-md)',
           }}
         >
           <Link
             to="/"
             style={{
-              fontSize: 'var(--font-size-xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text-on-primary)',
+              color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text-primary)',
               textDecoration: 'none',
+              fontWeight: location.pathname === '/' ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+              padding: 'var(--spacing-sm) var(--spacing-md)',
             }}
+            aria-label="Navigate to home page"
           >
-            GeoStory
+            Home
           </Link>
-
-          <div style={{ display: 'flex', gap: 'var(--spacing-lg)' }}>
-            <Link
-              to="/"
-              style={{
-                color: 'var(--color-text-on-primary)',
-                textDecoration: 'none',
-                fontWeight:
-                  location.pathname === '/'
-                    ? 'var(--font-weight-semibold)'
-                    : 'var(--font-weight-normal)',
-                opacity: location.pathname === '/' ? 1 : 0.8,
-              }}
-            >
-              Home
-            </Link>
-            <Link
-              to="/stories/new"
-              style={{
-                color: 'var(--color-text-on-primary)',
-                textDecoration: 'none',
-                fontWeight:
-                  location.pathname === '/stories/new'
-                    ? 'var(--font-weight-semibold)'
-                    : 'var(--font-weight-normal)',
-                opacity: location.pathname === '/stories/new' ? 1 : 0.8,
-              }}
-            >
-              Create Story
-            </Link>
-          </div>
-        </nav>
-      </header>
+          
+          <calcite-button
+            appearance="solid"
+            kind="brand"
+            scale="m"
+            onClick={() => navigate('/stories/new')}
+            aria-label="Create a new story"
+          >
+            New Story
+          </calcite-button>
+        </div>
+      </calcite-navigation>
 
       <main
         style={{
-          flex: 1,
+          padding: 'var(--spacing-xl)',
           maxWidth: '1200px',
           width: '100%',
           margin: '0 auto',
-          padding: 'var(--spacing-xl)',
         }}
       >
         <Outlet />
       </main>
 
       <footer
+        slot="footer"
         style={{
           backgroundColor: 'var(--color-surface)',
           borderTop: '1px solid var(--color-border)',
@@ -90,10 +71,10 @@ function AppLayout() {
         }}
       >
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          &copy; 2026 GeoStory. Built with React, TypeScript, and Vite.
+          &copy; 2026 GeoStory. Built with React, TypeScript, and Calcite Design System.
         </div>
       </footer>
-    </div>
+    </calcite-shell>
   );
 }
 
