@@ -1,11 +1,6 @@
-import { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 
-interface AppLayoutProps {
-  children: ReactNode;
-}
-
-function AppLayout({ children }: AppLayoutProps) {
+function AppLayout() {
   const location = useLocation();
 
   return (
@@ -81,7 +76,7 @@ function AppLayout({ children }: AppLayoutProps) {
           padding: 'var(--spacing-xl)',
         }}
       >
-        {children}
+        <Outlet />
       </main>
 
       <footer
