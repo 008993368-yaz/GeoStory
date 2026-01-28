@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { listStories } from '../services/stories';
 import { STORY_CATEGORIES, STORY_CATEGORY_LABELS } from '../constants/story';
@@ -16,6 +16,10 @@ function Home() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  
+  // Ref for scrolling to selected card
+  const selectedCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   // Get initial values from URL params
   const view = (searchParams.get('view') as ViewMode) || 'list';
@@ -101,6 +105,21 @@ function Home() {
     if (newOffset < total) {
       updateParam('offset', newOffset.toString());
     }
+  };
+
+  const handleSelectStory = (storyId: string) => {
+    setSelectedStoryId(storyId);
+    
+    // Scroll to the selected card if it exists
+    setTimeout(() => {
+      const cardElement = selectedCardRefs.current[storyId];
+      if (cardElement) {
+        cardElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }, 100);
   };
 
   // Computed values
@@ -238,7 +257,12 @@ function Home() {
         }}>
           Map
         </h2>
-        <MapView height={400} />
+        <MapView 
+          height={400} 
+          stories={stories}
+          selectedStoryId={selectedStoryId}
+          onSelectStory={handleSelectStory}
+        />
       </div>
 
       {/* Error State */}
@@ -311,7 +335,19 @@ function Home() {
           }}
         >
           {stories.map((story) => (
-            <StoryCard key={story.id} story={story} variant="default" />
+            <div
+              key={story.id}
+              ref={(el) => (selectedCardRefs.current[story.id] = el)}
+              onClick={() => handleSelectStory(story.id)}
+              style={{
+                cursor: 'pointer',
+                outline: selectedStoryId === story.id ? '2px solid var(--color-primary)' : 'none',
+                borderRadius: 'var(--border-radius-md)',
+                transition: 'outline 0.2s ease',
+              }}
+            >
+              <StoryCard story={story} variant="default" />
+            </div>
           ))}
         </div>
       )}
@@ -349,7 +385,19 @@ function Home() {
               {/* Stories for this date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
                 {storiesByDate[date].map((story) => (
-                  <StoryCard key={story.id} story={story} variant="compact" />
+                  <div
+                    key={story.id}
+                    ref={(el) => (selectedCardRefs.current[story.id] = el)}
+                    onClick={() => handleSelectStory(story.id)}
+                    style={{
+                      cursor: 'pointer',
+                      outline: selectedStoryId === story.id ? '2px solid var(--color-primary)' : 'none',
+                      borderRadius: 'var(--border-radius-md)',
+                      transition: 'outline 0.2s ease',
+                    }}
+                  >
+                    <StoryCard story={story} variant="compact" />
+                  </div>
                 ))}
               </div>
             </div>
