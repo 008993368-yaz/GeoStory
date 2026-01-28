@@ -11,6 +11,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
+    "@arcgis/core": "^4.34.8",
     "@esri/calcite-components": "^3.3.3",
     "axios": "^1.6.5",
     "react": "^18.2.0",

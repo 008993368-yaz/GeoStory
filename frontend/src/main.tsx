@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { defineCustomElements } from '@esri/calcite-components/dist/loader';
 import App from './App';
 import '@esri/calcite-components/dist/calcite/calcite.css';
+import '@arcgis/core/assets/esri/themes/light/main.css';
 import './styles/tokens.css';
 import './styles/global.css';
 

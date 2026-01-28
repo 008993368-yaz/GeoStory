@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { listStories } from '../services/stories';
 import { STORY_CATEGORIES, STORY_CATEGORY_LABELS } from '../constants/story';
 import StoryCard from '../components/story/StoryCard';
+import MapView from '../components/map/MapView';
 import type { StoryRead } from '../types';
 
 type ViewMode = 'list' | 'timeline';
@@ -226,6 +227,18 @@ function Home() {
             icon="search"
           />
         </calcite-label>
+      </div>
+
+      {/* Map Section */}
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <h2 style={{ 
+          fontSize: 'var(--font-size-xl)', 
+          marginBottom: 'var(--spacing-md)',
+          fontWeight: 600
+        }}>
+          Map
+        </h2>
+        <MapView height={400} />
       </div>
 
       {/* Error State */}
