@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createStory } from '../services/stories';
 import { STORY_CATEGORIES, STORY_CATEGORY_LABELS } from '../constants/story';
+import LocationPickerMap from '../components/map/LocationPickerMap';
 import type { StoryCreateRequest, StoryCategory } from '../types';
 
 interface FormData {
@@ -132,6 +133,21 @@ function StoryCreate() {
     }
   };
 
+  const handleMapLocationSelect = (coords: { lat: number; lng: number }) => {
+    setFormData((prev) => ({
+      ...prev,
+      location_lat: coords.lat.toFixed(6),
+      location_lng: coords.lng.toFixed(6),
+    }));
+    // Clear location validation errors
+    setValidationErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.location_lat;
+      delete newErrors.location_lng;
+      return newErrors;
+    });
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: 'var(--spacing-lg)' }}>Create New Story</h1>
@@ -237,6 +253,29 @@ function StoryCreate() {
             <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
               Location <span style={{ color: 'var(--color-error)' }}>*</span>
             </h3>
+            
+            {/* Map Location Picker */}
+            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+              <div style={{ 
+                fontSize: 'var(--font-size-sm)', 
+                color: 'var(--color-text-secondary)',
+                marginBottom: 'var(--spacing-xs)'
+              }}>
+                Click the map to set coordinates
+              </div>
+              <LocationPickerMap
+                value={
+                  formData.location_lat && formData.location_lng
+                    ? {
+                        lat: parseFloat(formData.location_lat),
+                        lng: parseFloat(formData.location_lng),
+                      }
+                    : null
+                }
+                onChange={handleMapLocationSelect}
+                height={320}
+              />
+            </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
               {/* Latitude */}
