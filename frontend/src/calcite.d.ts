@@ -136,5 +136,11 @@ declare namespace JSX {
       icon?: string | boolean;
       scale?: 's' | 'm' | 'l';
     }, HTMLElement>;
+    'calcite-loader': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
+      label?: string;
+      scale?: 's' | 'm' | 'l';
+      type?: 'determinate' | 'indeterminate';
+      value?: number;
+    }, HTMLElement>;
   }
 }

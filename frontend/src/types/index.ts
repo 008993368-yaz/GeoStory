@@ -37,6 +37,14 @@ export interface StoryRead {
   }>;
 }
 
+// Response from list stories endpoint with pagination metadata
+export interface StoryListResponse {
+  items: StoryRead[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Legacy types (for backward compatibility with existing components)
 export interface Story {
   id: string;
