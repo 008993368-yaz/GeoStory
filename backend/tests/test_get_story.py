@@ -6,14 +6,11 @@ These tests verify single story retrieval functionality, including:
 - 422 response for invalid UUID format
 
 Test Setup:
-    Tests use the configured database from DATABASE_URL environment variable.
-    Ensure docker-compose.dev.yml is running before executing tests:
+    Tests use centralized fixtures from conftest.py.
+    Run tests using the test runner script:
     
-        docker-compose -f docker-compose.dev.yml up -d
-    
-    Or set TEST_DATABASE_URL in your environment:
-    
-        export TEST_DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/geostory_test"
+        ./scripts/run_tests.ps1  # Windows
+        ./scripts/run_tests.sh   # Linux/Mac
 
 Run tests:
     pytest tests/test_get_story.py -v
@@ -23,26 +20,13 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-
-from app.main import app
+from httpx import AsyncClient
 
 
 # Test Fixtures
 
 @pytest_asyncio.fixture
-async def client() -> AsyncClient:
-    """Create an async HTTP client for testing."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        follow_redirects=False
-    ) as ac:
-        yield ac
-
-
-@pytest_asyncio.fixture
-async def sample_story(client: AsyncClient):
+async def sample_story(async_client: AsyncClient):
     """Create a sample story for testing.
     
     Returns the created story data including its ID.
@@ -56,7 +40,7 @@ async def sample_story(client: AsyncClient):
         "date_of_story": "2026-01-20",
     }
     
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Only return if creation was successful
     if response.status_code == 201:
@@ -68,14 +52,14 @@ async def sample_story(client: AsyncClient):
 # Test Cases
 
 @pytest.mark.asyncio
-async def test_get_story_success(client: AsyncClient, sample_story):
+async def test_get_story_success(async_client: AsyncClient, sample_story):
     """Test successful retrieval of a story by ID."""
     # Arrange: Ensure we have a sample story
     assert sample_story is not None, "Failed to create sample story"
     story_id = sample_story["id"]
     
     # Act: GET story by ID
-    response = await client.get(f"/api/stories/{story_id}")
+    response = await async_client.get(f"/api/stories/{story_id}")
     
     # Assert: 200 OK
     assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -103,14 +87,14 @@ async def test_get_story_success(client: AsyncClient, sample_story):
 
 
 @pytest.mark.asyncio
-async def test_get_story_includes_all_fields(client: AsyncClient, sample_story):
+async def test_get_story_includes_all_fields(async_client: AsyncClient, sample_story):
     """Test that retrieved story includes all expected fields."""
     # Arrange
     assert sample_story is not None
     story_id = sample_story["id"]
     
     # Act
-    response = await client.get(f"/api/stories/{story_id}")
+    response = await async_client.get(f"/api/stories/{story_id}")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -128,13 +112,13 @@ async def test_get_story_includes_all_fields(client: AsyncClient, sample_story):
 
 
 @pytest.mark.asyncio
-async def test_get_story_not_found(client: AsyncClient):
+async def test_get_story_not_found(async_client: AsyncClient):
     """Test that getting a non-existent story returns 404."""
     # Arrange: Generate a random UUID that doesn't exist
     nonexistent_id = uuid4()
     
     # Act: Try to GET non-existent story
-    response = await client.get(f"/api/stories/{nonexistent_id}")
+    response = await async_client.get(f"/api/stories/{nonexistent_id}")
     
     # Assert: 404 Not Found
     assert response.status_code == 404, f"Expected 404, got {response.status_code}"
@@ -146,13 +130,13 @@ async def test_get_story_not_found(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_story_invalid_uuid(client: AsyncClient):
+async def test_get_story_invalid_uuid(async_client: AsyncClient):
     """Test that invalid UUID format returns 422."""
     # Arrange: Use an invalid UUID string
     invalid_uuid = "not-a-valid-uuid"
     
     # Act: Try to GET with invalid UUID
-    response = await client.get(f"/api/stories/{invalid_uuid}")
+    response = await async_client.get(f"/api/stories/{invalid_uuid}")
     
     # Assert: 422 Unprocessable Entity (FastAPI validation error)
     assert response.status_code == 422, f"Expected 422, got {response.status_code}"
@@ -163,7 +147,7 @@ async def test_get_story_invalid_uuid(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_story_invalid_uuid_format_variations(client: AsyncClient):
+async def test_get_story_invalid_uuid_format_variations(async_client: AsyncClient):
     """Test various invalid UUID formats all return 422."""
     invalid_uuids = [
         "123",
@@ -175,7 +159,7 @@ async def test_get_story_invalid_uuid_format_variations(client: AsyncClient):
     
     for invalid_uuid in invalid_uuids:
         # Act
-        response = await client.get(f"/api/stories/{invalid_uuid}")
+        response = await async_client.get(f"/api/stories/{invalid_uuid}")
         
         # Assert: All should return 422
         assert response.status_code == 422, \
@@ -183,7 +167,7 @@ async def test_get_story_invalid_uuid_format_variations(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_story_preserves_null_fields(client: AsyncClient):
+async def test_get_story_preserves_null_fields(async_client: AsyncClient):
     """Test that stories with null optional fields are returned correctly."""
     # Arrange: Create a minimal story (only required fields)
     minimal_story_data = {
@@ -192,14 +176,14 @@ async def test_get_story_preserves_null_fields(client: AsyncClient):
         "location_lng": 0.0,
     }
     
-    create_response = await client.post("/api/stories/", json=minimal_story_data)
+    create_response = await async_client.post("/api/stories/", json=minimal_story_data)
     if create_response.status_code != 201:
         pytest.skip("Could not create minimal story (DB not available)")
     
     story_id = create_response.json()["id"]
     
     # Act: GET the minimal story
-    response = await client.get(f"/api/stories/{story_id}")
+    response = await async_client.get(f"/api/stories/{story_id}")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -213,15 +197,15 @@ async def test_get_story_preserves_null_fields(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_story_multiple_retrievals_consistent(client: AsyncClient, sample_story):
+async def test_get_story_multiple_retrievals_consistent(async_client: AsyncClient, sample_story):
     """Test that retrieving the same story multiple times returns consistent data."""
     # Arrange
     assert sample_story is not None
     story_id = sample_story["id"]
     
     # Act: GET the same story twice
-    response1 = await client.get(f"/api/stories/{story_id}")
-    response2 = await client.get(f"/api/stories/{story_id}")
+    response1 = await async_client.get(f"/api/stories/{story_id}")
+    response2 = await async_client.get(f"/api/stories/{story_id}")
     
     # Assert: Both successful
     assert response1.status_code == 200
@@ -238,7 +222,7 @@ async def test_get_story_multiple_retrievals_consistent(client: AsyncClient, sam
 
 
 @pytest.mark.asyncio
-async def test_get_story_with_different_categories(client: AsyncClient):
+async def test_get_story_with_different_categories(async_client: AsyncClient):
     """Test retrieving stories with different categories."""
     # Arrange: Create stories with different categories
     categories = ["travel", "food", "history"]
@@ -251,7 +235,7 @@ async def test_get_story_with_different_categories(client: AsyncClient):
             "location_lat": 0.0,
             "location_lng": 0.0,
         }
-        create_response = await client.post("/api/stories/", json=story_data)
+        create_response = await async_client.post("/api/stories/", json=story_data)
         if create_response.status_code == 201:
             story_ids.append((create_response.json()["id"], category))
     
@@ -261,14 +245,14 @@ async def test_get_story_with_different_categories(client: AsyncClient):
     
     # Act & Assert: GET each story and verify category
     for story_id, expected_category in story_ids:
-        response = await client.get(f"/api/stories/{story_id}")
+        response = await async_client.get(f"/api/stories/{story_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["category"] == expected_category
 
 
 @pytest.mark.asyncio
-async def test_get_story_response_matches_create_response(client: AsyncClient):
+async def test_get_story_response_matches_create_response(async_client: AsyncClient):
     """Test that GET response matches the POST response (except timestamps may differ slightly)."""
     # Arrange: Create a story
     story_data = {
@@ -280,7 +264,7 @@ async def test_get_story_response_matches_create_response(client: AsyncClient):
         "date_of_story": "2026-01-15",
     }
     
-    create_response = await client.post("/api/stories/", json=story_data)
+    create_response = await async_client.post("/api/stories/", json=story_data)
     if create_response.status_code != 201:
         pytest.skip("Could not create story (DB not available)")
     
@@ -288,7 +272,7 @@ async def test_get_story_response_matches_create_response(client: AsyncClient):
     story_id = created_data["id"]
     
     # Act: GET the story
-    get_response = await client.get(f"/api/stories/{story_id}")
+    get_response = await async_client.get(f"/api/stories/{story_id}")
     
     # Assert: 200 OK
     assert get_response.status_code == 200

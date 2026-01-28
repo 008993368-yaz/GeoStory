@@ -7,14 +7,11 @@ These tests verify story listing functionality, including:
 - Ordering (asc/desc by created_at)
 
 Test Setup:
-    Tests use the configured database from DATABASE_URL environment variable.
-    Ensure docker-compose.dev.yml is running before executing tests:
+    Tests use centralized fixtures from conftest.py.
+    Run tests using the test runner script:
     
-        docker-compose -f docker-compose.dev.yml up -d
-    
-    Or set TEST_DATABASE_URL in your environment:
-    
-        export TEST_DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/geostory_test"
+        ./scripts/run_tests.ps1  # Windows
+        ./scripts/run_tests.sh   # Linux/Mac
 
 Run tests:
     pytest tests/test_list_stories.py -v
@@ -24,26 +21,13 @@ from datetime import date, timedelta
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-
-from app.main import app
+from httpx import AsyncClient
 
 
 # Test Fixtures
 
 @pytest_asyncio.fixture
-async def client() -> AsyncClient:
-    """Create an async HTTP client for testing."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        follow_redirects=False
-    ) as ac:
-        yield ac
-
-
-@pytest_asyncio.fixture
-async def sample_stories(client: AsyncClient):
+async def sample_stories(async_client: AsyncClient):
     """Create sample stories for testing.
     
     Creates stories with different categories, dates, and content
@@ -53,7 +37,7 @@ async def sample_stories(client: AsyncClient):
     today = date.today()
     
     # Story 1: Travel category, recent
-    story1 = await client.post("/api/stories/", json={
+    story1 = await async_client.post("/api/stories/", json={
         "title": "Amazing Trip to Paris",
         "body": "Visited the Eiffel Tower and Louvre Museum. Incredible experience!",
         "category": "travel",
@@ -65,7 +49,7 @@ async def sample_stories(client: AsyncClient):
         stories.append(story1.json())
     
     # Story 2: Food category, older
-    story2 = await client.post("/api/stories/", json={
+    story2 = await async_client.post("/api/stories/", json={
         "title": "Best Ramen in Tokyo",
         "body": "Found an amazing ramen shop in Shibuya.",
         "category": "food",
@@ -77,7 +61,7 @@ async def sample_stories(client: AsyncClient):
         stories.append(story2.json())
     
     # Story 3: Travel category, oldest
-    story3 = await client.post("/api/stories/", json={
+    story3 = await async_client.post("/api/stories/", json={
         "title": "Hiking in the Alps",
         "body": "Beautiful mountain views and fresh air.",
         "category": "travel",
@@ -89,7 +73,7 @@ async def sample_stories(client: AsyncClient):
         stories.append(story3.json())
     
     # Story 4: History category, no date
-    story4 = await client.post("/api/stories/", json={
+    story4 = await async_client.post("/api/stories/", json={
         "title": "Ancient Rome Tour",
         "body": "Visited the Colosseum and Roman Forum.",
         "category": "history",
@@ -100,7 +84,7 @@ async def sample_stories(client: AsyncClient):
         stories.append(story4.json())
     
     # Story 5: Nature category with unique keyword
-    story5 = await client.post("/api/stories/", json={
+    story5 = await async_client.post("/api/stories/", json={
         "title": "Sunset at Grand Canyon",
         "body": "Breathtaking panoramic sunset views.",
         "category": "nature",
@@ -117,10 +101,10 @@ async def sample_stories(client: AsyncClient):
 # Test Cases
 
 @pytest.mark.asyncio
-async def test_list_default_pagination(client: AsyncClient):
+async def test_list_default_pagination(async_client: AsyncClient):
     """Test listing stories with default pagination parameters."""
     # Act: GET stories with defaults
-    response = await client.get("/api/stories/")
+    response = await async_client.get("/api/stories/")
     
     # Assert: 200 OK
     assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -144,13 +128,13 @@ async def test_list_default_pagination(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_custom_limit_offset(client: AsyncClient, sample_stories):
+async def test_list_custom_limit_offset(async_client: AsyncClient, sample_stories):
     """Test listing with custom limit and offset."""
     # Arrange: Ensure we have at least 3 stories
     assert len(sample_stories) >= 3, "Need at least 3 sample stories"
     
     # Act: GET first page (limit=2, offset=0)
-    response1 = await client.get("/api/stories/?limit=2&offset=0")
+    response1 = await async_client.get("/api/stories/?limit=2&offset=0")
     
     # Assert: First page
     assert response1.status_code == 200
@@ -160,7 +144,7 @@ async def test_list_custom_limit_offset(client: AsyncClient, sample_stories):
     assert len(data1["items"]) <= 2
     
     # Act: GET second page (limit=2, offset=2)
-    response2 = await client.get("/api/stories/?limit=2&offset=2")
+    response2 = await async_client.get("/api/stories/?limit=2&offset=2")
     
     # Assert: Second page
     assert response2.status_code == 200
@@ -176,14 +160,14 @@ async def test_list_custom_limit_offset(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_filter_category(client: AsyncClient, sample_stories):
+async def test_list_filter_category(async_client: AsyncClient, sample_stories):
     """Test filtering stories by category."""
     # Arrange: We have stories with category='travel'
     travel_count = sum(1 for s in sample_stories if s.get("category") == "travel")
     assert travel_count > 0, "Need at least one travel story"
     
     # Act: Filter by travel category
-    response = await client.get("/api/stories/?category=travel")
+    response = await async_client.get("/api/stories/?category=travel")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -197,10 +181,10 @@ async def test_list_filter_category(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_filter_category_no_results(client: AsyncClient, sample_stories):
+async def test_list_filter_category_no_results(async_client: AsyncClient, sample_stories):
     """Test filtering by category with no matching stories."""
     # Act: Filter by a category that doesn't exist
-    response = await client.get("/api/stories/?category=nonexistent")
+    response = await async_client.get("/api/stories/?category=nonexistent")
     
     # Assert: 200 OK with empty results
     assert response.status_code == 200
@@ -210,13 +194,13 @@ async def test_list_filter_category_no_results(client: AsyncClient, sample_stori
 
 
 @pytest.mark.asyncio
-async def test_list_date_range_from(client: AsyncClient, sample_stories):
+async def test_list_date_range_from(async_client: AsyncClient, sample_stories):
     """Test filtering stories by date_from."""
     # Arrange: Get a reference date (5 days ago)
     from_date = date.today() - timedelta(days=7)
     
     # Act: Filter stories from 7 days ago onwards
-    response = await client.get(f"/api/stories/?date_from={from_date}")
+    response = await async_client.get(f"/api/stories/?date_from={from_date}")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -230,13 +214,13 @@ async def test_list_date_range_from(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_date_range_to(client: AsyncClient, sample_stories):
+async def test_list_date_range_to(async_client: AsyncClient, sample_stories):
     """Test filtering stories by date_to."""
     # Arrange: Get a reference date (5 days ago)
     to_date = date.today() - timedelta(days=5)
     
     # Act: Filter stories up to 5 days ago
-    response = await client.get(f"/api/stories/?date_to={to_date}")
+    response = await async_client.get(f"/api/stories/?date_to={to_date}")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -250,14 +234,14 @@ async def test_list_date_range_to(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_date_range_both(client: AsyncClient, sample_stories):
+async def test_list_date_range_both(async_client: AsyncClient, sample_stories):
     """Test filtering stories by both date_from and date_to."""
     # Arrange: Date range (20 days ago to 2 days ago)
     from_date = date.today() - timedelta(days=20)
     to_date = date.today() - timedelta(days=2)
     
     # Act: Filter with date range
-    response = await client.get(f"/api/stories/?date_from={from_date}&date_to={to_date}")
+    response = await async_client.get(f"/api/stories/?date_from={from_date}&date_to={to_date}")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -272,10 +256,10 @@ async def test_list_date_range_both(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_search_q_title(client: AsyncClient, sample_stories):
+async def test_list_search_q_title(async_client: AsyncClient, sample_stories):
     """Test text search in story titles."""
     # Act: Search for "Paris" in title
-    response = await client.get("/api/stories/?q=Paris")
+    response = await async_client.get("/api/stories/?q=Paris")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -294,10 +278,10 @@ async def test_list_search_q_title(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_search_q_body(client: AsyncClient, sample_stories):
+async def test_list_search_q_body(async_client: AsyncClient, sample_stories):
     """Test text search in story body."""
     # Act: Search for "Louvre" (appears in body)
-    response = await client.get("/api/stories/?q=Louvre")
+    response = await async_client.get("/api/stories/?q=Louvre")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -316,12 +300,12 @@ async def test_list_search_q_body(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_search_q_case_insensitive(client: AsyncClient, sample_stories):
+async def test_list_search_q_case_insensitive(async_client: AsyncClient, sample_stories):
     """Test that text search is case-insensitive."""
     # Act: Search with different cases
-    response1 = await client.get("/api/stories/?q=PARIS")
-    response2 = await client.get("/api/stories/?q=paris")
-    response3 = await client.get("/api/stories/?q=PaRiS")
+    response1 = await async_client.get("/api/stories/?q=PARIS")
+    response2 = await async_client.get("/api/stories/?q=paris")
+    response3 = await async_client.get("/api/stories/?q=PaRiS")
     
     # Assert: All should return the same results
     assert response1.status_code == 200
@@ -337,10 +321,10 @@ async def test_list_search_q_case_insensitive(client: AsyncClient, sample_storie
 
 
 @pytest.mark.asyncio
-async def test_list_search_q_no_results(client: AsyncClient, sample_stories):
+async def test_list_search_q_no_results(async_client: AsyncClient, sample_stories):
     """Test text search with no matching results."""
     # Act: Search for something that doesn't exist
-    response = await client.get("/api/stories/?q=xyzabc123nonexistent")
+    response = await async_client.get("/api/stories/?q=xyzabc123nonexistent")
     
     # Assert: 200 OK with empty results
     assert response.status_code == 200
@@ -350,13 +334,13 @@ async def test_list_search_q_no_results(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_ordering_desc_default(client: AsyncClient, sample_stories):
+async def test_list_ordering_desc_default(async_client: AsyncClient, sample_stories):
     """Test default ordering (created_at DESC - newest first)."""
     # Arrange: Ensure we have multiple stories
     assert len(sample_stories) >= 2, "Need at least 2 stories"
     
     # Act: GET without order parameter (should default to desc)
-    response = await client.get("/api/stories/")
+    response = await async_client.get("/api/stories/")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -372,13 +356,13 @@ async def test_list_ordering_desc_default(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_ordering_asc(client: AsyncClient, sample_stories):
+async def test_list_ordering_asc(async_client: AsyncClient, sample_stories):
     """Test ascending order (created_at ASC - oldest first)."""
     # Arrange: Ensure we have multiple stories
     assert len(sample_stories) >= 2, "Need at least 2 stories"
     
     # Act: GET with order=asc
-    response = await client.get("/api/stories/?order=asc")
+    response = await async_client.get("/api/stories/?order=asc")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -394,10 +378,10 @@ async def test_list_ordering_asc(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_ordering_explicit_desc(client: AsyncClient, sample_stories):
+async def test_list_ordering_explicit_desc(async_client: AsyncClient, sample_stories):
     """Test explicit descending order."""
     # Act: GET with order=desc
-    response = await client.get("/api/stories/?order=desc")
+    response = await async_client.get("/api/stories/?order=desc")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -412,10 +396,10 @@ async def test_list_ordering_explicit_desc(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_combined_filters(client: AsyncClient, sample_stories):
+async def test_list_combined_filters(async_client: AsyncClient, sample_stories):
     """Test combining multiple filters (category + date + search)."""
     # Act: Combine category and search
-    response = await client.get("/api/stories/?category=travel&q=Paris")
+    response = await async_client.get("/api/stories/?category=travel&q=Paris")
     
     # Assert: 200 OK
     assert response.status_code == 200
@@ -433,15 +417,15 @@ async def test_list_combined_filters(client: AsyncClient, sample_stories):
 
 
 @pytest.mark.asyncio
-async def test_list_limit_bounds(client: AsyncClient):
+async def test_list_limit_bounds(async_client: AsyncClient):
     """Test limit parameter bounds validation."""
     # Act: Test with limit=0 (should be rejected or adjusted)
-    response1 = await client.get("/api/stories/?limit=0")
+    response1 = await async_client.get("/api/stories/?limit=0")
     # Should either be 422 (validation error) or adjusted to minimum
     assert response1.status_code in [200, 422]
     
     # Act: Test with limit=101 (exceeds max of 100)
-    response2 = await client.get("/api/stories/?limit=101")
+    response2 = await async_client.get("/api/stories/?limit=101")
     # Should either be 422 or capped at 100
     assert response2.status_code in [200, 422]
     if response2.status_code == 200:
@@ -450,20 +434,20 @@ async def test_list_limit_bounds(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_offset_negative(client: AsyncClient):
+async def test_list_offset_negative(async_client: AsyncClient):
     """Test that negative offset is rejected."""
     # Act: Try negative offset
-    response = await client.get("/api/stories/?offset=-1")
+    response = await async_client.get("/api/stories/?offset=-1")
     
     # Assert: Should be rejected with 422
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_list_empty_database(client: AsyncClient):
+async def test_list_empty_database(async_client: AsyncClient):
     """Test listing when no stories match filters."""
     # Act: Use a very restrictive date range
-    response = await client.get("/api/stories/?date_from=1900-01-01&date_to=1900-01-02")
+    response = await async_client.get("/api/stories/?date_from=1900-01-01&date_to=1900-01-02")
     
     # Assert: 200 OK with empty results
     assert response.status_code == 200
@@ -475,10 +459,10 @@ async def test_list_empty_database(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_response_structure(client: AsyncClient):
+async def test_list_response_structure(async_client: AsyncClient):
     """Test that response includes all required fields."""
     # Act: GET stories
-    response = await client.get("/api/stories/")
+    response = await async_client.get("/api/stories/")
     
     # Assert: 200 OK
     assert response.status_code == 200

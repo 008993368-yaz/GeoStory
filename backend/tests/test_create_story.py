@@ -7,43 +7,24 @@ These tests verify story creation functionality, including:
 - Anonymous vs. attributed story creation
 
 Test Setup:
-    Tests use the configured database from DATABASE_URL environment variable.
-    Ensure docker-compose.dev.yml is running before executing tests:
+    Tests use centralized fixtures from conftest.py.
+    Run tests using the test runner script:
     
-        docker-compose -f docker-compose.dev.yml up -d
-    
-    Or set TEST_DATABASE_URL in your environment:
-    
-        export TEST_DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/geostory_test"
+        ./scripts/run_tests.ps1  # Windows
+        ./scripts/run_tests.sh   # Linux/Mac
 
 Run tests:
     pytest tests/test_create_story.py -v
 """
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-
-from app.main import app
-
-
-# Test Fixtures
-
-@pytest_asyncio.fixture
-async def client() -> AsyncClient:
-    """Create an async HTTP client for testing."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        follow_redirects=False
-    ) as ac:
-        yield ac
+from httpx import AsyncClient
 
 
 # Test Cases
 
 @pytest.mark.asyncio
-async def test_create_story_success(client: AsyncClient):
+async def test_create_story_success(async_client: AsyncClient):
     """Test successful story creation with valid data."""
     # Arrange: Valid story payload
     story_data = {
@@ -56,7 +37,7 @@ async def test_create_story_success(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 201 Created
     assert response.status_code == 201, f"Expected 201, got {response.status_code}: {response.text}"
@@ -84,7 +65,7 @@ async def test_create_story_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_minimal(client: AsyncClient):
+async def test_create_story_minimal(async_client: AsyncClient):
     """Test story creation with only required fields."""
     # Arrange: Minimal valid payload (title + coordinates)
     story_data = {
@@ -94,7 +75,7 @@ async def test_create_story_minimal(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 201 Created
     assert response.status_code == 201
@@ -107,7 +88,7 @@ async def test_create_story_minimal(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_invalid_lat_too_high(client: AsyncClient):
+async def test_create_story_invalid_lat_too_high(async_client: AsyncClient):
     """Test story creation fails with latitude > 90."""
     # Arrange: Invalid latitude
     story_data = {
@@ -117,7 +98,7 @@ async def test_create_story_invalid_lat_too_high(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity (Pydantic validation)
     assert response.status_code == 422
@@ -130,7 +111,7 @@ async def test_create_story_invalid_lat_too_high(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_invalid_lat_too_low(client: AsyncClient):
+async def test_create_story_invalid_lat_too_low(async_client: AsyncClient):
     """Test story creation fails with latitude < -90."""
     # Arrange: Invalid latitude
     story_data = {
@@ -140,14 +121,14 @@ async def test_create_story_invalid_lat_too_low(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_create_story_invalid_lng_too_high(client: AsyncClient):
+async def test_create_story_invalid_lng_too_high(async_client: AsyncClient):
     """Test story creation fails with longitude > 180."""
     # Arrange: Invalid longitude
     story_data = {
@@ -157,7 +138,7 @@ async def test_create_story_invalid_lng_too_high(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity
     assert response.status_code == 422
@@ -169,7 +150,7 @@ async def test_create_story_invalid_lng_too_high(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_invalid_category(client: AsyncClient):
+async def test_create_story_invalid_category(async_client: AsyncClient):
     """Test story creation fails with invalid category."""
     # Arrange: Invalid category
     story_data = {
@@ -180,7 +161,7 @@ async def test_create_story_invalid_category(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity (Pydantic validates category as Literal)
     assert response.status_code == 422
@@ -192,7 +173,7 @@ async def test_create_story_invalid_category(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_missing_required_field(client: AsyncClient):
+async def test_create_story_missing_required_field(async_client: AsyncClient):
     """Test story creation fails when missing required field."""
     # Arrange: Missing title (required field)
     story_data = {
@@ -202,7 +183,7 @@ async def test_create_story_missing_required_field(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity
     assert response.status_code == 422
@@ -214,7 +195,7 @@ async def test_create_story_missing_required_field(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_future_date(client: AsyncClient):
+async def test_create_story_future_date(async_client: AsyncClient):
     """Test story creation fails with future date."""
     # Arrange: Future date (validator should reject)
     story_data = {
@@ -225,7 +206,7 @@ async def test_create_story_future_date(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity (Pydantic validator)
     assert response.status_code == 422
@@ -237,7 +218,7 @@ async def test_create_story_future_date(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_title_too_long(client: AsyncClient):
+async def test_create_story_title_too_long(async_client: AsyncClient):
     """Test story creation fails with title exceeding max length."""
     # Arrange: Title > 500 characters
     long_title = "A" * 501
@@ -248,7 +229,7 @@ async def test_create_story_title_too_long(client: AsyncClient):
     }
     
     # Act: POST to /api/stories
-    response = await client.post("/api/stories/", json=story_data)
+    response = await async_client.post("/api/stories/", json=story_data)
     
     # Assert: 422 Unprocessable Entity
     assert response.status_code == 422
@@ -260,7 +241,7 @@ async def test_create_story_title_too_long(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_story_boundary_coordinates(client: AsyncClient):
+async def test_create_story_boundary_coordinates(async_client: AsyncClient):
     """Test story creation succeeds with boundary coordinate values."""
     # Arrange: Boundary values (should be valid)
     test_cases = [
@@ -276,7 +257,7 @@ async def test_create_story_boundary_coordinates(client: AsyncClient):
         }
         
         # Act: POST to /api/stories/
-        response = await client.post("/api/stories/", json=story_data)
+        response = await async_client.post("/api/stories/", json=story_data)
         
         # Assert: 201 Created
         assert response.status_code == 201, f"Boundary test failed for {coords}: {response.text}"

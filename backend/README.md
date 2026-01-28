@@ -194,7 +194,138 @@ docker-compose -f docker-compose.dev.yml exec backend alembic upgrade head
 ## Next Steps
 
 - ✅ Database schema and migrations
-- Implement SQLAlchemy ORM models
+- ✅ SQLAlchemy ORM models
+- ✅ Story CRUD endpoints
+- ✅ Backend testing infrastructure
 - Implement authentication
-- Add story CRUD endpoints
-- Set up file uploads for media
+- Add photo upload endpoints
+
+## Running Tests
+
+GeoStory uses pytest with an isolated test database for reliable testing.
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+- Backend dependencies installed (`pip install -r requirements.txt`)
+
+### Quick Start
+
+Run the full test suite with the provided test runner:
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\run_tests.ps1
+```
+
+**Linux/macOS (Bash):**
+```bash
+# Make the test script executable (first time only)
+chmod +x scripts/run_tests.sh
+
+# Run tests
+./scripts/run_tests.sh
+```
+
+The test runner will:
+1. Start an isolated PostgreSQL test database on port 5433
+2. Wait for the database to be ready
+3. Run database migrations
+4. Execute all tests with verbose output
+5. Report results
+
+### Manual Testing
+
+If you want more control over the testing process:
+
+```bash
+# 1. Start the test database
+docker-compose -f docker-compose.test.yml up -d
+
+# 2. Wait for database to be ready
+docker-compose -f docker-compose.test.yml exec -T db_test pg_isready -U geostory_user -d geostory_test
+
+# 3. Set environment variable and run migrations
+export TEST_DATABASE_URL="postgresql+asyncpg://geostory_user:geostory_pass@localhost:5433/geostory_test"
+export DATABASE_URL="$TEST_DATABASE_URL"
+alembic upgrade head
+
+# 4. Run tests
+pytest tests/ -v
+
+# 5. Cleanup (optional)
+docker-compose -f docker-compose.test.yml down
+```
+
+### Running Specific Tests
+
+```bash
+# Run a specific test file
+pytest tests/test_create_story.py -v
+
+# Run a specific test function
+pytest tests/test_create_story.py::test_create_story_success -v
+
+# Run tests matching a pattern
+pytest tests/ -k "create" -v
+
+# Run with coverage report
+pytest tests/ --cov=app --cov-report=html
+```
+
+### Test Database
+
+The test database:
+- Runs in Docker on port 5433 (separate from dev database on 5432)
+- Uses database name: `geostory_test`
+- Credentials: `geostory_user` / `geostory_pass`
+- Automatically truncates tables between tests for isolation
+- Managed by fixtures in `tests/conftest.py`
+
+### Test Structure
+
+```
+tests/
+├── conftest.py              # Shared pytest fixtures (db, client)
+├── test_health.py           # Health check endpoint tests
+├── test_create_story.py     # POST /api/stories tests
+├── test_get_story.py        # GET /api/stories/{id} tests
+├── test_list_stories.py     # GET /api/stories tests
+├── test_story_schema.py     # Pydantic schema validation tests
+└── test_validation.py       # Input validation tests
+```
+
+### Environment Variables for Testing
+
+- `TEST_DATABASE_URL`: PostgreSQL connection string for tests (default: `postgresql+asyncpg://geostory_user:geostory_pass@localhost:5433/geostory_test`)
+
+### Troubleshooting Tests
+
+**Database connection errors:**
+```bash
+# Check if test database is running
+docker ps | grep geostory_test
+
+# View test database logs
+docker-compose -f docker-compose.test.yml logs db_test
+
+# Restart test database
+docker-compose -f docker-compose.test.yml restart
+```
+
+**Migration errors:**
+```bash
+# Reset test database completely
+docker-compose -f docker-compose.test.yml down -v
+docker-compose -f docker-compose.test.yml up -d
+alembic upgrade head
+```
+
+**Port conflicts:**
+```bash
+# Check what's using port 5433
+netstat -ano | findstr :5433  # Windows
+lsof -i :5433                 # macOS/Linux
+
+# Stop conflicting service or change port in docker-compose.test.yml
+```
