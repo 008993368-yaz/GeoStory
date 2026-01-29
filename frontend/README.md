@@ -100,6 +100,67 @@ Format code with Prettier:
 npm run format
 ```
 
+## Testing
+
+Run tests in watch mode:
+
+```bash
+npm run test
+```
+
+Run tests once (CI mode):
+
+```bash
+npm run test:ci
+```
+
+### Testing Stack
+
+- **Vitest** - Fast unit testing framework compatible with Vite
+- **@testing-library/react** - React component testing utilities
+- **jsdom** - DOM simulation for Node.js
+- **@testing-library/jest-dom** - Custom DOM matchers
+
+### Test Structure
+
+```
+src/
+├── test/
+│   ├── setup.ts              # Vitest setup, Calcite stubs, matchMedia mock
+│   ├── renderWithRouter.tsx  # MemoryRouter wrapper for route-dependent tests
+│   └── __mocks__/            # Module mocks
+│       └── arcgis-core/      # Lightweight ArcGIS mocks
+├── pages/
+│   └── __tests__/
+│       ├── Home.test.tsx         # Home page smoke tests
+│       └── StoryCreate.test.tsx  # Story creation page tests
+└── components/
+    └── map/
+        └── __mocks__/        # Map component mocks
+            ├── MapView.tsx
+            └── LocationPickerMap.tsx
+```
+
+### Testing Notes
+
+**Calcite Design System:**
+Calcite components are custom elements that need stubs in jsdom. The `setup.ts` file defines empty custom elements for all Calcite components used in the app.
+
+**ArcGIS Mocking:**
+ArcGIS JS API modules are ~2GB and cause memory issues in tests. We use Vite aliases in `vite.config.ts` to replace them with lightweight mocks that return stub objects:
+
+```typescript
+// vite.config.ts test aliases (excerpt)
+alias: {
+  '@arcgis/core/Map': './src/test/__mocks__/arcgis-core/Map.ts',
+  '@arcgis/core/views/MapView': './src/test/__mocks__/arcgis-core/MapView.ts',
+  // ... more aliases
+}
+```
+
+**Memory Management:**
+Tests use `pool: 'forks'` (child processes) instead of threads for better memory isolation when ArcGIS modules slip through.
+
 ## Features
 
 - ✅ Strict TypeScript configuration
@@ -110,6 +171,9 @@ npm run format
 - ✅ Environment variable support
 - ✅ Production-ready build configuration
 - ✅ Clean, scalable folder structure
+- ✅ Vitest smoke tests for pages
+- ✅ Calcite Design System integration
+- ✅ ArcGIS JS API for interactive maps
 
 ## API Integration
 
@@ -126,11 +190,10 @@ API client is located in `src/services/api.ts` with:
 
 ## Next Steps
 
-- Add Calcite Design System components
-- Integrate ArcGIS JS API for mapping features
-- Implement authentication
-- Add state management (if needed)
-- Set up testing framework
+- Add photo upload support
+- Implement user authentication (OAuth2)
+- Add map clustering for many pins
+- Improve test coverage for form interactions
 
 ## License
 

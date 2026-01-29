@@ -53,17 +53,18 @@ services:
     ports:
       - "5173:5173"
     environment:
-      # Backend API URL for the frontend
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # Backend API URL for Vite proxy (Docker internal network)
+      VITE_API_URL: http://backend:8000
+      # ArcGIS API Key (set in .env.dev or pass directly)
+      VITE_ARCGIS_API_KEY: ${VITE_ARCGIS_API_KEY:-}
+    volumes:
+      # Mount source for live reload, but exclude node_modules
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:
       - geostory-network
-    # Mount source for hot module replacement
-    volumes:
-      - ./frontend:/app
-      # Exclude node_modules to avoid conflicts
-      - /app/node_modules
 
 networks:
   geostory-network:

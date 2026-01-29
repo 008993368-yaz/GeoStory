@@ -6,12 +6,36 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import esriConfig from '@arcgis/core/config';
 import Map from '@arcgis/core/Map';
 import ArcGISMapView from '@arcgis/core/views/MapView';
 import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 import Graphic from '@arcgis/core/Graphic';
 import Point from '@arcgis/core/geometry/Point';
 import SimpleMarkerSymbol from '@arcgis/core/symbols/SimpleMarkerSymbol';
+import Basemap from '@arcgis/core/Basemap';
+import WebTileLayer from '@arcgis/core/layers/WebTileLayer';
+
+// Configure ArcGIS API key if available
+const apiKey = import.meta.env.VITE_ARCGIS_API_KEY;
+if (apiKey) {
+  esriConfig.apiKey = apiKey;
+}
+
+// Create a custom basemap using OpenStreetMap tiles (no auth required)
+function createOSMBasemap(): Basemap {
+  const osmLayer = new WebTileLayer({
+    urlTemplate: 'https://tile.openstreetmap.org/{level}/{col}/{row}.png',
+    copyright: '© OpenStreetMap contributors',
+    subDomains: ['a', 'b', 'c'],
+  });
+  
+  return new Basemap({
+    baseLayers: [osmLayer],
+    title: 'OpenStreetMap',
+    id: 'custom-osm',
+  });
+}
 
 interface LocationPickerMapProps {
   /** Current location value { lat, lng } or null */
@@ -46,8 +70,14 @@ function LocationPickerMap({
 
     let isMounted = true;
     let clickHandler: any = null;
+    let initTimeout: ReturnType<typeof setTimeout>;
 
     const initMap = async () => {
+      // Check if still mounted before creating expensive resources
+      if (!isMounted || !mapContainerRef.current) {
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
@@ -58,9 +88,9 @@ function LocationPickerMap({
         });
         graphicsLayerRef.current = graphicsLayer;
 
-        // Create map
+        // Create map with custom OSM basemap (no auth required)
         const map = new Map({
-          basemap: 'streets-vector',
+          basemap: createOSMBasemap(),
           layers: [graphicsLayer],
         });
 
@@ -87,12 +117,25 @@ function LocationPickerMap({
           }
         });
 
-        await view.when();
+        // Wait for view to be ready (ignore AbortError from StrictMode/HMR)
+        try {
+          await view.when();
+        } catch (viewError: any) {
+          // AbortError is expected when component unmounts during load
+          if (viewError?.name === 'AbortError') {
+            return;
+          }
+          console.warn('Map view warning (may still work):', viewError);
+        }
 
         if (isMounted) {
           setIsLoading(false);
         }
       } catch (err: any) {
+        // AbortError is expected during unmount - not a real error
+        if (err?.name === 'AbortError') {
+          return;
+        }
         console.error('Error initializing location picker map:', err);
         if (isMounted) {
           setError(err.message || 'Failed to load map');
@@ -101,10 +144,16 @@ function LocationPickerMap({
       }
     };
 
-    initMap();
+    // Delay initialization to allow React StrictMode's test unmount to complete
+    initTimeout = setTimeout(() => {
+      initMap();
+    }, 0);
 
     return () => {
       isMounted = false;
+      
+      // Clear the timeout if component unmounts before init
+      clearTimeout(initTimeout);
       
       if (clickHandler) {
         clickHandler.remove();

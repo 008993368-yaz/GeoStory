@@ -32,26 +32,38 @@ Write-Host ""
 
 # Load .env file if it exists
 if (Test-Path .env) {
-    Write-Host "[✓] Found .env file, loading environment variables..." -ForegroundColor Green
+    Write-Host "[+] Found .env file, loading environment variables..." -ForegroundColor Green
     Get-Content .env | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]+)\s*=\s*(.+)\s*$') {
+        # Skip empty lines and comments
+        if ($_ -match '^\s*$') { return }
+        if ($_ -match '^\s*#') { return }
+        # Parse KEY=VALUE
+        if ($_ -match '^([^=]+)=(.*)$') {
             $name = $matches[1].Trim()
             $value = $matches[2].Trim()
+            # Remove surrounding double quotes
+            if ($value.StartsWith('"') -and $value.EndsWith('"')) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            # Remove surrounding single quotes
+            if ($value.StartsWith("'") -and $value.EndsWith("'")) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
             Set-Item -Path "env:$name" -Value $value
         }
     }
 } else {
-    Write-Host "[⚠] No .env file found, using existing environment variables" -ForegroundColor Yellow
+    Write-Host "[!] No .env file found, using existing environment variables" -ForegroundColor Yellow
 }
 Write-Host ""
 
 # Check if DATABASE_URL is set
 if (-not $env:DATABASE_URL) {
-    Write-Host "[✗] ERROR: DATABASE_URL environment variable is not set" -ForegroundColor Red
+    Write-Host "[X] ERROR: DATABASE_URL environment variable is not set" -ForegroundColor Red
     Write-Host ""
     Write-Host "Please set DATABASE_URL in one of the following ways:"
     Write-Host "  1. Create a .env file with: DATABASE_URL=postgresql://user:pass@host:port/db"
-    Write-Host "  2. Set it: `$env:DATABASE_URL='postgresql://user:pass@host:port/db'"
+    Write-Host "  2. Set it manually in PowerShell"
     Write-Host ""
     Write-Host "Example: DATABASE_URL=postgresql://ls_user:password@localhost:5432/geostory"
     exit 1
@@ -59,28 +71,28 @@ if (-not $env:DATABASE_URL) {
 
 # Mask password in DATABASE_URL for display
 $DisplayUrl = $env:DATABASE_URL -replace ':\/\/[^:]*:[^@]*@', '://***:***@'
-Write-Host "[✓] DATABASE_URL is set: $DisplayUrl" -ForegroundColor Green
+Write-Host "[+] DATABASE_URL is set: $DisplayUrl" -ForegroundColor Green
 Write-Host ""
 
 # Check if alembic command exists
-try {
-    $null = Get-Command alembic -ErrorAction Stop
-    Write-Host "[✓] Alembic is installed" -ForegroundColor Green
-    Write-Host ""
-} catch {
-    Write-Host "[✗] ERROR: alembic command not found" -ForegroundColor Red
+$alembicCmd = Get-Command alembic -ErrorAction SilentlyContinue
+if (-not $alembicCmd) {
+    Write-Host "[X] ERROR: alembic command not found" -ForegroundColor Red
     Write-Host ""
     Write-Host "Please install Alembic:"
     Write-Host "  pip install alembic"
     exit 1
 }
+Write-Host "[+] Alembic is installed" -ForegroundColor Green
+Write-Host ""
 
 # Show current revision before migration
 Write-Host "Current database revision:"
-try {
-    alembic -c alembic.ini current 2>&1
-} catch {
+$output = alembic -c alembic.ini current 2>&1
+if ($LASTEXITCODE -ne 0) {
     Write-Host "  (no revision - database is empty or uninitialized)"
+} else {
+    Write-Host $output
 }
 Write-Host ""
 
@@ -89,12 +101,13 @@ Write-Host "Running migrations..." -ForegroundColor Green
 Write-Host "Command: alembic -c alembic.ini upgrade head"
 Write-Host ""
 
-try {
-    alembic -c alembic.ini upgrade head
-    
+alembic -c alembic.ini upgrade head
+$migrationExitCode = $LASTEXITCODE
+
+if ($migrationExitCode -eq 0) {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
-    Write-Host "[✓] Migrations completed successfully!" -ForegroundColor Green
+    Write-Host "[+] Migrations completed successfully!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     
@@ -104,10 +117,10 @@ try {
     Write-Host ""
     
     exit 0
-} catch {
+} else {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Red
-    Write-Host "[✗] Migration failed" -ForegroundColor Red
+    Write-Host "[X] Migration failed" -ForegroundColor Red
     Write-Host "========================================" -ForegroundColor Red
     Write-Host ""
     Write-Host "Please check the error messages above and verify:"

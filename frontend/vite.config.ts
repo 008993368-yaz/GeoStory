@@ -7,9 +7,12 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    port: 5173,
+    host: true,
     proxy: {
       '/api': {
+        // In Docker: VITE_API_URL=http://backend:8000
+        // Local dev: defaults to http://localhost:8000
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
